@@ -209,7 +209,7 @@ export default function Home() {
 
         {/* Footer Hint */}
         <footer className="text-center border-t border-stone-100 pt-6">
-           <p className="text-xs text-stone-400 font-light">
+           <p className="text-xs text-stone-500 font-light">
              <span className="font-semibold text-amber-500">Tip:</span> ลองถามว่า "มีโซฟาตัว L สีเทาไหม" หรือ "แนะนำเตียง 6 ฟุตหน่อย"
            </p>
         </footer>
