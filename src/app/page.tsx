@@ -1,65 +1,220 @@
-import Image from "next/image";
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+// import ไอคอนที่เหมาะกับร้านเฟอร์นิเจอร์
+import { Mic, Square, User, Armchair, Sparkles, AlertCircle, ShoppingBag } from "lucide-react";
+
+type ApiResult = {
+  transcript?: string;
+  answer?: string;
+  matches?: Array<any>;
+  error?: string;
+};
 
 export default function Home() {
+  const [isListening, setIsListening] = useState(false);
+  const [status, setStatus] = useState("แตะที่ไมค์เพื่อเริ่มค้นหา");
+  const [result, setResult] = useState<ApiResult>({});
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      setStatus("เบราว์เซอร์ไม่รองรับ (กรุณาใช้ Chrome)");
+      setResult({ error: "Browser not supported" });
+      return;
+    }
+
+    const rec = new SpeechRecognition();
+    rec.lang = "th-TH";
+    rec.interimResults = false;
+    rec.maxAlternatives = 1;
+
+    rec.onstart = () => {
+      setIsListening(true);
+      setIsProcessing(false);
+      setStatus("กำลังฟัง... (เช่น โซฟา, เตียงนอน)");
+    };
+
+    rec.onend = () => {
+      setIsListening(false);
+      if (!isProcessing) {
+         setStatus("แตะที่ไมค์เพื่อถามใหม่");
+      }
+    };
+
+    rec.onerror = (e: any) => {
+      setIsListening(false);
+      setIsProcessing(false);
+      const isNoSpeech = e?.error === 'no-speech';
+      setStatus(isNoSpeech ? "ไม่ได้ยินเสียง ลองใหม่นะครับ" : "เกิดข้อขัดข้อง");
+      if (!isNoSpeech) setResult({ error: e?.error });
+    };
+
+    rec.onresult = async (event: any) => {
+      const transcript = event.results?.[0]?.[0]?.transcript || "";
+      if (!transcript.trim()) return;
+
+      setStatus("กำลังค้นหาเฟอร์นิเจอร์...");
+      setIsProcessing(true);
+      setResult({ transcript });
+
+      try {
+        const resp = await fetch("/api/voice", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: transcript }),
+        });
+
+        if (!resp.ok) throw new Error("API Error");
+
+        const data: ApiResult = await resp.json();
+        setResult(data);
+        setStatus(data.error ? "ขออภัย พบปัญหาบางอย่าง" : "ค้นหาสำเร็จ");
+      } catch (err) {
+        setResult({ ...result, error: "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้" });
+        setStatus("การเชื่อมต่อล้มเหลว");
+      } finally {
+        setIsProcessing(false);
+      }
+    };
+
+    recognitionRef.current = rec;
+  }, [isProcessing, result]);
+
+  const toggleListening = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+    } else {
+      setResult({}); 
+      try {
+        recognitionRef.current?.start();
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    // เปลี่ยนพื้นหลังเป็นสี Stone (เทาอมน้ำตาล) ให้ความรู้สึก Modern Luxury
+    <main className="min-h-screen bg-[#F5F5F4] flex items-center justify-center p-4 md:p-8 font-sans">
+      
+      <div className="bg-white w-full max-w-2xl rounded-[2rem] shadow-2xl shadow-stone-200/50 p-6 md:p-12 space-y-8 relative overflow-hidden">
+        
+        {/* Decorative Background Blob */}
+        <div className="absolute top-[-50px] right-[-50px] w-32 h-32 bg-amber-100 rounded-full blur-3xl opacity-50 pointer-events-none" />
+
+        {/* Header */}
+        <header className="text-center space-y-3 relative z-10">
+          <div className="inline-flex items-center justify-center p-4 bg-amber-50 rounded-full mb-2 shadow-sm">
+            <Armchair className="w-8 h-8 text-amber-600" />
+          </div>
+          <h1 className="text-3xl md:text-4xl font-serif font-bold text-stone-800 tracking-tight">
+            CozyHome <span className="text-amber-600">Assistant</span>
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="text-stone-500 text-sm md:text-base max-w-md mx-auto font-light">
+            แต่งบ้านในฝันได้ง่ายๆ เพียงแค่บอกเรา
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+        </header>
+
+        {/* Voice Controller */}
+        <section className="flex flex-col items-center justify-center space-y-6 py-2">
+          <div className="relative group">
+            {isListening && (
+              <>
+                <span className="absolute top-0 left-0 w-full h-full rounded-full bg-amber-400 animate-ping opacity-20 duration-1000"></span>
+                <span className="absolute top-[-10%] left-[-10%] w-[120%] h-[120%] rounded-full bg-amber-200 animate-ping opacity-10 delay-150 duration-1000"></span>
+              </>
+            )}
+            
+            <button
+              onClick={toggleListening}
+              disabled={isProcessing}
+              className={`relative z-10 flex items-center justify-center w-24 h-24 rounded-full shadow-lg transition-all duration-300 ease-out transform
+                ${isListening
+                  ? "bg-rose-500 text-white scale-110 shadow-rose-200" 
+                  : "bg-stone-800 text-white hover:bg-amber-600 hover:scale-105 shadow-stone-300"
+                } ${isProcessing ? 'opacity-70 cursor-wait' : ''}`}
+            >
+              {isListening ? (
+                <Square className="w-8 h-8 fill-current" />
+              ) : (
+                <Mic className="w-9 h-9" />
+              )}
+            </button>
+          </div>
+
+          <div className={`text-center text-sm font-medium tracking-wide transition-colors duration-300 ${isListening ? "text-amber-600" : "text-stone-400"}`}>
+            {status}
+          </div>
+        </section>
+
+        {/* Conversation Area */}
+        <section className="space-y-5 border-t border-stone-100 pt-8 min-h-[200px]">
+          
+          {/* User Input */}
+          {result.transcript && (
+            <div className="flex gap-4 items-end justify-end animate-in slide-in-from-bottom-2 fade-in duration-500">
+              <div className="bg-stone-100 text-stone-700 py-3 px-5 rounded-2xl rounded-tr-sm max-w-[80%] text-right shadow-sm">
+                <p className="text-sm md:text-base">{result.transcript}</p>
+              </div>
+              <div className="w-8 h-8 bg-stone-200 rounded-full flex items-center justify-center flex-shrink-0">
+                <User className="w-4 h-4 text-stone-500" />
+              </div>
+            </div>
+          )}
+
+          {/* AI Response */}
+          {(result.answer || result.error || isProcessing) && (
+            <div className="flex gap-4 items-start animate-in slide-in-from-bottom-2 fade-in duration-500 delay-75">
+               <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${result.error ? 'bg-red-100' : 'bg-amber-600'}`}>
+                 {result.error ? <AlertCircle className="w-4 h-4 text-red-500" /> : <Sparkles className="w-4 h-4 text-white" />}
+               </div>
+              
+              <div className={`py-4 px-6 rounded-2xl rounded-tl-sm max-w-[90%] shadow-sm ${
+                result.error 
+                    ? "bg-red-50 text-red-800 border border-red-100" 
+                    : "bg-amber-50/80 text-stone-800 border border-amber-100"
+                }`}>
+                  
+                  {isProcessing && !result.answer && !result.error ? (
+                     <div className="flex space-x-1.5 py-2">
+                        <div className="w-2 h-2 bg-amber-400 rounded-full animate-bounce"></div>
+                        <div className="w-2 h-2 bg-amber-400 rounded-full animate-bounce delay-75"></div>
+                        <div className="w-2 h-2 bg-amber-400 rounded-full animate-bounce delay-150"></div>
+                     </div>
+                  ) : (
+                    <div className="prose prose-stone prose-sm">
+                      <p className="leading-relaxed whitespace-pre-wrap">
+                        {result.error || result.answer}
+                      </p>
+                    </div>
+                  )}
+              </div>
+            </div>
+          )}
+
+          {!result.transcript && !isListening && (
+            <div className="text-center py-8 opacity-40 flex flex-col items-center">
+                <ShoppingBag className="w-12 h-12 mb-2 text-stone-300"/>
+                <p className="text-sm text-stone-400">ยังไม่มีรายการสนทนา</p>
+            </div>
+          )}
+
+        </section>
+
+        {/* Footer Hint */}
+        <footer className="text-center border-t border-stone-100 pt-6">
+           <p className="text-xs text-stone-400 font-light">
+             <span className="font-semibold text-amber-500">Tip:</span> ลองถามว่า "มีโซฟาตัว L สีเทาไหม" หรือ "แนะนำเตียง 6 ฟุตหน่อย"
+           </p>
+        </footer>
+
+      </div>
+    </main>
   );
 }
